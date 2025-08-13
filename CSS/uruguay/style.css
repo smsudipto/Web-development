@@ -1,0 +1,48 @@
+.A {
+    height: 400px;
+    width: 700px;
+    background-color: white;
+    margin: 10% auto;
+    position: relative;
+    top: 0;
+    margin-top: 20px;
+
+}
+
+.B {
+    height: 20px;
+    width: 550px;
+    background-color: skyblue;
+    margin-left: 150px;
+
+}
+
+.C {
+    height: 20px;
+    width: 700px;
+    background-color: skyblue;
+    margin-top: 100px;
+
+}
+
+.D {
+    height: 20px;
+    width: 700px;
+    background-color: skyblue;
+    margin-top: 100px;
+
+}
+
+.E {
+    height: 20px;
+    width: 700px;
+    background-color: skyblue;
+    margin-top: 100px;
+
+}
+
+.photo {
+    height: 100px;
+    width: 100px;
+    position: absolute;
+}
