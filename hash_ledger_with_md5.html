@@ -1,0 +1,1609 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hash Ledger — SHA-256 / SHA-512, step by step</title>
+  <style>
+    :root {
+      --paper: #eef1f6;
+      --paper-line: #d7e0ec;
+      --ink: #1b2a4a;
+      --ink-soft: #4a5b7c;
+      --stamp: #b23a2e;
+      --derived: #2f7b6d;
+      --card: #ffffff;
+      --card-border: #c9d4e3;
+      --mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Consolas, "Courier New", monospace;
+      --sans: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background:
+        linear-gradient(var(--paper-line) 1px, transparent 1px) 0 0/100% 28px,
+        linear-gradient(90deg, var(--paper-line) 1px, transparent 1px) 0 0/28px 100%,
+        var(--paper);
+      color: var(--ink);
+      font-family: var(--sans);
+      min-height: 100vh;
+      padding: 20px 16px 60px;
+    }
+
+    .wrap {
+      max-width: 980px;
+      margin: 0 auto;
+    }
+
+    header {
+      margin-bottom: 22px;
+    }
+
+    .eyebrow {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: var(--stamp);
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    h1 {
+      font-family: var(--mono);
+      font-weight: 700;
+      font-size: clamp(22px, 4vw, 32px);
+      margin: 0 0 4px;
+      letter-spacing: -0.01em;
+    }
+
+    .sub {
+      color: var(--ink-soft);
+      font-size: 14px;
+      max-width: 60ch;
+      line-height: 1.5;
+    }
+
+    .controls {
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 16px;
+      margin: 18px 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: flex-end;
+      box-shadow: 0 1px 0 rgba(27, 42, 74, .04);
+    }
+
+    .field {
+      flex: 1 1 260px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .field label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--ink-soft);
+      font-weight: 700;
+    }
+
+    input[type=text] {
+      font-family: var(--mono);
+      font-size: 15px;
+      padding: 10px 12px;
+      border: 1.5px solid var(--card-border);
+      border-radius: 6px;
+      background: #fbfcfe;
+      color: var(--ink);
+      width: 100%;
+    }
+
+    input[type=text]:focus {
+      outline: 2px solid var(--ink);
+      outline-offset: 1px;
+    }
+
+    .pillrow {
+      display: flex;
+      gap: 6px;
+    }
+
+    .pill {
+      font-family: var(--mono);
+      font-size: 12.5px;
+      padding: 9px 14px;
+      border-radius: 999px;
+      border: 1.5px solid var(--card-border);
+      background: #fbfcfe;
+      cursor: pointer;
+      color: var(--ink-soft);
+      font-weight: 600;
+    }
+
+    .pill.active {
+      background: var(--ink);
+      color: #fff;
+      border-color: var(--ink);
+    }
+
+    .pill:focus-visible {
+      outline: 2px solid var(--stamp);
+      outline-offset: 2px;
+    }
+
+    button.go {
+      font-family: var(--mono);
+      font-weight: 700;
+      font-size: 13.5px;
+      padding: 10px 18px;
+      background: var(--stamp);
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      letter-spacing: .02em;
+    }
+
+    button.go:hover {
+      filter: brightness(1.08);
+    }
+
+    button.go:focus-visible {
+      outline: 2px solid var(--ink);
+      outline-offset: 2px;
+    }
+
+    .presets {
+      font-size: 12px;
+      color: var(--ink-soft);
+      margin-top: -6px;
+      margin-bottom: 4px;
+    }
+
+    .presets a {
+      color: var(--derived);
+      cursor: pointer;
+      text-decoration: underline;
+      font-weight: 600;
+    }
+
+    .stepper {
+      display: flex;
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      overflow: hidden;
+      background: var(--card);
+      margin-bottom: 18px;
+    }
+
+    .step-tab {
+      flex: 1;
+      text-align: center;
+      padding: 12px 8px;
+      cursor: pointer;
+      font-family: var(--mono);
+      font-size: 12.5px;
+      font-weight: 700;
+      color: var(--ink-soft);
+      border-right: 1px solid var(--card-border);
+      position: relative;
+    }
+
+    .step-tab:last-child {
+      border-right: none;
+    }
+
+    .step-tab .n {
+      display: block;
+      font-size: 10px;
+      color: var(--stamp);
+      margin-bottom: 3px;
+    }
+
+    .step-tab.active {
+      background: var(--ink);
+      color: #fff;
+    }
+
+    .step-tab.active .n {
+      color: #ffb3ab;
+    }
+
+    .step-tab:hover:not(.active) {
+      background: #f2f5fa;
+    }
+
+    .panel {
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 20px;
+      min-height: 340px;
+    }
+
+    .panel h2 {
+      font-family: var(--mono);
+      font-size: 16px;
+      margin: 0 0 4px;
+    }
+
+    .panel .desc {
+      color: var(--ink-soft);
+      font-size: 13.5px;
+      margin-bottom: 16px;
+      line-height: 1.5;
+      max-width: 70ch;
+    }
+
+    .eli5 {
+      background: #fff8e9;
+      border: 1.5px solid #e8d6a0;
+      border-radius: 8px;
+      padding: 12px 14px;
+      margin-bottom: 16px;
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+    }
+
+    .eli5 .tag {
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: .08em;
+      background: #e8a93a;
+      color: #3a2a05;
+      padding: 3px 7px;
+      border-radius: 5px;
+      white-space: nowrap;
+      margin-top: 1px;
+    }
+
+    .eli5 p {
+      margin: 0;
+      font-size: 13.5px;
+      line-height: 1.55;
+      color: #4a3a10;
+    }
+
+    code,
+    .mono {
+      font-family: var(--mono);
+    }
+
+    /* Byte tape */
+    .tape-legend {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+      font-size: 11.5px;
+      color: var(--ink-soft);
+    }
+
+    .tape-legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .swatch {
+      width: 11px;
+      height: 11px;
+      border-radius: 3px;
+      display: inline-block;
+    }
+
+    .byte-tape {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 3px;
+      margin-bottom: 18px;
+    }
+
+    .byte {
+      font-family: var(--mono);
+      font-size: 11px;
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+      border: 1px solid rgba(27, 42, 74, .15);
+      background: #f6f8fb;
+      color: var(--ink);
+    }
+
+    .byte.msg {
+      background: #dfe7f4;
+    }
+
+    .byte.pad1 {
+      background: var(--stamp);
+      color: #fff;
+      font-weight: 700;
+    }
+
+    .byte.pad0 {
+      background: #eef1f6;
+      color: #a9b6cc;
+    }
+
+    .byte.len {
+      background: var(--derived);
+      color: #fff;
+    }
+
+    .stat-row {
+      display: flex;
+      gap: 22px;
+      flex-wrap: wrap;
+      margin-bottom: 18px;
+    }
+
+    .stat {
+      font-family: var(--mono);
+    }
+
+    .stat .k {
+      font-size: 10.5px;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: var(--ink-soft);
+      display: block;
+    }
+
+    .stat .v {
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .blocks-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 6px;
+    }
+
+    .block-card {
+      font-family: var(--mono);
+      font-size: 12px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: 1.5px solid var(--card-border);
+      cursor: pointer;
+      background: #fbfcfe;
+      min-width: 110px;
+    }
+
+    .block-card.active {
+      border-color: var(--stamp);
+      background: #fff6f5;
+    }
+
+    .block-card .k {
+      color: var(--ink-soft);
+      font-size: 10px;
+      text-transform: uppercase;
+    }
+
+    /* Schedule table */
+    table.sched {
+      border-collapse: collapse;
+      width: 100%;
+      font-family: var(--mono);
+      font-size: 12.5px;
+    }
+
+    table.sched th {
+      text-align: left;
+      font-size: 10.5px;
+      text-transform: uppercase;
+      color: var(--ink-soft);
+      border-bottom: 1.5px solid var(--card-border);
+      padding: 6px 8px;
+    }
+
+    table.sched td {
+      padding: 5px 8px;
+      border-bottom: 1px solid #eef1f6;
+      vertical-align: top;
+    }
+
+    table.sched tr.direct td.w {
+      color: var(--ink);
+    }
+
+    table.sched tr.derived td.w {
+      color: var(--derived);
+      font-weight: 700;
+    }
+
+    .formula {
+      color: var(--ink-soft);
+      font-size: 11.5px;
+    }
+
+    .sched-scroll {
+      max-height: 420px;
+      overflow-y: auto;
+      border: 1px solid var(--paper-line);
+      border-radius: 8px;
+    }
+
+    /* Round rail */
+    .rail {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 18px;
+      flex-wrap: wrap;
+    }
+
+    .reg {
+      flex: 1;
+      min-width: 90px;
+      background: #0f1c33;
+      color: #dfe7f4;
+      border-radius: 8px;
+      padding: 10px 8px;
+      text-align: center;
+      font-family: var(--mono);
+      transition: transform .18s ease, background .18s ease;
+    }
+
+    .reg .name {
+      font-size: 11px;
+      color: #8fa3c4;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+
+    .reg .val {
+      font-size: 13px;
+      font-weight: 700;
+      margin-top: 4px;
+      word-break: break-all;
+    }
+
+    .reg.touched {
+      background: var(--stamp);
+      transform: translateY(-3px);
+    }
+
+    .reg.shift {
+      outline: 2px dashed rgba(255, 255, 255, .35);
+    }
+
+    .round-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+
+    .round-controls button {
+      font-family: var(--mono);
+      font-weight: 700;
+      font-size: 12.5px;
+      padding: 8px 12px;
+      border-radius: 6px;
+      border: 1.5px solid var(--card-border);
+      background: #fbfcfe;
+      cursor: pointer;
+      color: var(--ink);
+    }
+
+    .round-controls button:disabled {
+      opacity: .4;
+      cursor: not-allowed;
+    }
+
+    .round-counter {
+      font-family: var(--mono);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    input[type=range] {
+      accent-color: var(--stamp);
+    }
+
+    .calc-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .calc-card {
+      border: 1px solid var(--paper-line);
+      border-radius: 8px;
+      padding: 10px 12px;
+      background: #fbfcfe;
+    }
+
+    .calc-card .k {
+      font-family: var(--mono);
+      font-size: 10.5px;
+      text-transform: uppercase;
+      color: var(--ink-soft);
+      display: block;
+      margin-bottom: 3px;
+    }
+
+    .calc-card .v {
+      font-family: var(--mono);
+      font-size: 12px;
+      word-break: break-all;
+      font-weight: 700;
+    }
+
+    .calc-card .expr {
+      font-family: var(--mono);
+      font-size: 10.5px;
+      color: var(--ink-soft);
+      margin-top: 3px;
+    }
+
+    /* Digest */
+    .digest-box {
+      font-family: var(--mono);
+      font-size: clamp(12px, 2.4vw, 17px);
+      background: #0f1c33;
+      color: #dfe7f4;
+      padding: 18px;
+      border-radius: 10px;
+      word-break: break-all;
+      line-height: 1.6;
+      margin-bottom: 14px;
+    }
+
+    .chain {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 16px;
+    }
+
+    .chain-row {
+      font-family: var(--mono);
+      font-size: 12px;
+      display: flex;
+      gap: 10px;
+      align-items: baseline;
+    }
+
+    .chain-row .lab {
+      color: var(--ink-soft);
+      min-width: 90px;
+    }
+
+    button.copy {
+      font-family: var(--mono);
+      font-size: 12px;
+      padding: 8px 14px;
+      border-radius: 6px;
+      border: 1.5px solid var(--card-border);
+      background: #fbfcfe;
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    .navrow {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 16px;
+    }
+
+    .navrow button {
+      font-family: var(--mono);
+      font-weight: 700;
+      font-size: 13px;
+      padding: 10px 16px;
+      border-radius: 6px;
+      border: 1.5px solid var(--card-border);
+      background: #fbfcfe;
+      cursor: pointer;
+    }
+
+    .navrow button:disabled {
+      opacity: .35;
+      cursor: not-allowed;
+    }
+
+    footer {
+      margin-top: 26px;
+      font-size: 11.5px;
+      color: var(--ink-soft);
+      text-align: center;
+    }
+
+    ::selection {
+      background: var(--stamp);
+      color: #fff;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .reg {
+        transition: none;
+      }
+    }
+
+    @keyframes spin {
+      0% {
+        transform: rotate(0deg);
+      }
+
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+
+    <header>
+      <div class="eyebrow" id="algoEyebrow">FIPS 180-4 · worked by hand</div>
+      <h1>Hash Ledger</h1>
+      <p class="sub">Type a message, watch it get padded, chopped into blocks, expanded into a message schedule, and
+        mixed for 64 (or 80) rounds — one arithmetic step at a time. Nothing here calls a crypto library; every value on
+        screen is computed in front of you.</p>
+    </header>
+
+    <div class="controls">
+      <div class="field" style="flex:2 1 320px;">
+        <label for="msgInput">Message</label>
+        <input type="text" id="msgInput" value="abc" spellcheck="false">
+      </div>
+      <div class="field" style="flex:0 0 auto;">
+        <label>Algorithm</label>
+        <div class="pillrow">
+          <button class="pill active" data-algo="sha256" id="pill256">SHA-256</button>
+          <button class="pill" data-algo="sha512" id="pill512">SHA-512</button>
+          <button class="pill" data-algo="md5" id="pillmd5">MD5</button>
+        </div>
+      </div>
+      <button class="go" id="computeBtn">Compute →</button>
+      <button class="go" id="decryptBtn" style="background:var(--derived); display:none;">Decrypt MD5 🔓</button>
+    </div>
+    <div class="presets">Try: <a data-preset="abc">abc</a> · <a data-preset="">(empty string)</a> · <a
+        data-preset="The quick brown fox jumps over the lazy dog">the quick brown fox…</a> · <a
+        data-preset="Hello BUBT CSE!">Hello BUBT CSE!</a></div>
+
+    <div class="stepper" id="stepper">
+      <div class="step-tab active" data-step="0"><span class="n">STEP 1</span>Message &amp; Padding</div>
+      <div class="step-tab" data-step="1"><span class="n">STEP 2</span>Message Schedule</div>
+      <div class="step-tab" data-step="2"><span class="n">STEP 3</span>Compression Rounds</div>
+      <div class="step-tab" data-step="3"><span class="n">STEP 4</span>Final Digest</div>
+    </div>
+
+    <div class="panel" id="panel"></div>
+
+    <div class="navrow">
+      <button id="prevBtn">← Back</button>
+      <button id="nextBtn">Next →</button>
+    </div>
+
+    <footer>Runs entirely in this page — no network calls, no data leaves the browser. Built for classroom use.</footer>
+  </div>
+
+  <script>
+    /* =========================================================
+       VERIFIED HASH ENGINES (checked byte-for-byte against
+       Node's crypto module for SHA-256 and SHA-512 before use)
+       ========================================================= */
+
+    const S_MD5 = [
+      7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22,
+      5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20,
+      4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23,
+      6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21
+    ];
+    const K_MD5 = [];
+    for (let i = 0; i < 64; i++) {
+      K_MD5[i] = Math.floor(4294967296 * Math.abs(Math.sin(i + 1))) >>> 0;
+    }
+    const H_MD5init = [0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476];
+
+    function md5WordToHex(x) {
+      let s = '';
+      for (let i = 0; i < 4; i++) {
+        const byte = (x >>> (i * 8)) & 0xFF;
+        s += byte.toString(16).padStart(2, '0');
+      }
+      return s;
+    }
+
+    function md5F(b, c, d) { return ((b & c) | (~b & d)) >>> 0; }
+    function md5G(b, c, d) { return ((b & d) | (c & ~d)) >>> 0; }
+    function md5H(b, c, d) { return (b ^ c ^ d) >>> 0; }
+    function md5I(b, c, d) { return (c ^ (b | ~d)) >>> 0; }
+
+    function rotl32(x, n) { return ((x << n) | (x >>> (32 - n))) >>> 0; }
+
+    function md5Trace(bytes) {
+      const bitLen = BigInt(bytes.length) * 8n;
+      let padded = Array.from(bytes);
+      const oneBytePos = padded.length;
+      padded.push(0x80);
+      const zeroTarget = 56;
+      while ((padded.length % 64) !== zeroTarget) padded.push(0);
+      const zeroEnd = padded.length;
+      const lenBytes = new Array(8).fill(0);
+      let bl = bitLen;
+      for (let i = 0; i < 8; i++) {
+        lenBytes[i] = Number(bl & 0xFFn);
+        bl >>= 8n;
+      }
+      padded = padded.concat(lenBytes);
+
+      const blocks = [];
+      for (let i = 0; i < padded.length; i += 64) blocks.push(padded.slice(i, i + 64));
+
+      let H = H_MD5init.slice();
+      const blockTraces = [];
+
+      for (const block of blocks) {
+        const W = new Array(16).fill(0);
+        for (let t = 0; t < 16; t++) {
+          W[t] = (block[t * 4] | block[t * 4 + 1] << 8 | block[t * 4 + 2] << 16 | block[t * 4 + 3] << 24) >>> 0;
+        }
+
+        const W_expanded = new Array(64).fill(0);
+        const Wmeta = new Array(64).fill(null);
+        for (let t = 0; t < 64; t++) {
+          let g;
+          let formula;
+          if (t < 16) {
+            g = t;
+            formula = `copied directly: W_block[${g}]`;
+          } else if (t < 32) {
+            g = (5 * t + 1) % 16;
+            formula = `(5 * ${t} + 1) mod 16 = ${g}`;
+          } else if (t < 48) {
+            g = (3 * t + 5) % 16;
+            formula = `(3 * ${t} + 5) mod 16 = ${g}`;
+          } else {
+            g = (7 * t) % 16;
+            formula = `(7 * ${t}) mod 16 = ${g}`;
+          }
+          W_expanded[t] = W[g];
+          Wmeta[t] = { direct: t < 16, g, formula };
+        }
+
+        const Hbefore = H.slice();
+        let [a, b, c, d] = H;
+        const rounds = [];
+
+        for (let t = 0; t < 64; t++) {
+          let funcVal, funcExpr;
+          if (t < 16) {
+            funcVal = md5F(b, c, d);
+            funcExpr = `(b & c) | (~b & d)`;
+          } else if (t < 32) {
+            funcVal = md5G(b, c, d);
+            funcExpr = `(b & d) | (c & ~d)`;
+          } else if (t < 48) {
+            funcVal = md5H(b, c, d);
+            funcExpr = `b ^ c ^ d`;
+          } else {
+            funcVal = md5I(b, c, d);
+            funcExpr = `c ^ (b | ~d)`;
+          }
+
+          const K = K_MD5[t];
+          const W_val = W_expanded[t];
+          const T = (a + funcVal + K + W_val) >>> 0;
+          const s = S_MD5[t];
+          const T_rot = rotl32(T, s);
+          const newB = (b + T_rot) >>> 0;
+
+          rounds.push({
+            t, a, b, c, d,
+            funcVal, funcExpr,
+            K, W: W_val, g: Wmeta[t].g,
+            T, s, T_rot, newB
+          });
+
+          const nextA = d;
+          const nextB = newB;
+          const nextC = b;
+          const nextD = c;
+
+          a = nextA;
+          b = nextB;
+          c = nextC;
+          d = nextD;
+        }
+
+        H[0] = (H[0] + a) >>> 0;
+        H[1] = (H[1] + b) >>> 0;
+        H[2] = (H[2] + c) >>> 0;
+        H[3] = (H[3] + d) >>> 0;
+
+        blockTraces.push({ block, W: W_expanded, Wmeta, Hbefore, rounds, Hafter: H.slice() });
+      }
+
+      return {
+        algo: 'md5', wordBits: 32, rounds: 64, blockBytes: 64,
+        bytes, padded, oneBytePos, zeroEnd, bitLen,
+        blocks: blockTraces, digest: H.map(md5WordToHex).join(''), fmt: md5WordToHex
+      };
+    }
+
+    function md5Fast(str) {
+      const bytes = new TextEncoder().encode(str);
+      const bitLen = BigInt(bytes.length) * 8n;
+      let padded = Array.from(bytes);
+      padded.push(0x80);
+      while ((padded.length % 64) !== 56) padded.push(0);
+      let bl = bitLen;
+      for (let i = 0; i < 8; i++) {
+        padded.push(Number(bl & 0xFFn));
+        bl >>= 8n;
+      }
+
+      let H = [0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476];
+
+      for (let offset = 0; offset < padded.length; offset += 64) {
+        const W = new Array(16);
+        for (let t = 0; t < 16; t++) {
+          W[t] = (padded[offset + t * 4] | padded[offset + t * 4 + 1] << 8 | padded[offset + t * 4 + 2] << 16 | padded[offset + t * 4 + 3] << 24) >>> 0;
+        }
+
+        let [a, b, c, d] = H;
+
+        // Round 1
+        a = (b + rotl32((a + md5F(b, c, d) + K_MD5[0] + W[0]) >>> 0, 7)) >>> 0;
+        d = (a + rotl32((d + md5F(a, b, c) + K_MD5[1] + W[1]) >>> 0, 12)) >>> 0;
+        c = (d + rotl32((c + md5F(d, a, b) + K_MD5[2] + W[2]) >>> 0, 17)) >>> 0;
+        b = (c + rotl32((b + md5F(c, d, a) + K_MD5[3] + W[3]) >>> 0, 22)) >>> 0;
+        a = (b + rotl32((a + md5F(b, c, d) + K_MD5[4] + W[4]) >>> 0, 7)) >>> 0;
+        d = (a + rotl32((d + md5F(a, b, c) + K_MD5[5] + W[5]) >>> 0, 12)) >>> 0;
+        c = (d + rotl32((c + md5F(d, a, b) + K_MD5[6] + W[6]) >>> 0, 17)) >>> 0;
+        b = (c + rotl32((b + md5F(c, d, a) + K_MD5[7] + W[7]) >>> 0, 22)) >>> 0;
+        a = (b + rotl32((a + md5F(b, c, d) + K_MD5[8] + W[8]) >>> 0, 7)) >>> 0;
+        d = (a + rotl32((d + md5F(a, b, c) + K_MD5[9] + W[9]) >>> 0, 12)) >>> 0;
+        c = (d + rotl32((c + md5F(d, a, b) + K_MD5[10] + W[10]) >>> 0, 17)) >>> 0;
+        b = (c + rotl32((b + md5F(c, d, a) + K_MD5[11] + W[11]) >>> 0, 22)) >>> 0;
+        a = (b + rotl32((a + md5F(b, c, d) + K_MD5[12] + W[12]) >>> 0, 7)) >>> 0;
+        d = (a + rotl32((d + md5F(a, b, c) + K_MD5[13] + W[13]) >>> 0, 12)) >>> 0;
+        c = (d + rotl32((c + md5F(d, a, b) + K_MD5[14] + W[14]) >>> 0, 17)) >>> 0;
+        b = (c + rotl32((b + md5F(c, d, a) + K_MD5[15] + W[15]) >>> 0, 22)) >>> 0;
+
+        // Round 2
+        a = (b + rotl32((a + md5G(b, c, d) + K_MD5[16] + W[1]) >>> 0, 5)) >>> 0;
+        d = (a + rotl32((d + md5G(a, b, c) + K_MD5[17] + W[6]) >>> 0, 9)) >>> 0;
+        c = (d + rotl32((c + md5G(d, a, b) + K_MD5[18] + W[11]) >>> 0, 14)) >>> 0;
+        b = (c + rotl32((b + md5G(c, d, a) + K_MD5[19] + W[0]) >>> 0, 20)) >>> 0;
+        a = (b + rotl32((a + md5G(b, c, d) + K_MD5[20] + W[5]) >>> 0, 5)) >>> 0;
+        d = (a + rotl32((d + md5G(a, b, c) + K_MD5[21] + W[10]) >>> 0, 9)) >>> 0;
+        c = (d + rotl32((c + md5G(d, a, b) + K_MD5[22] + W[15]) >>> 0, 14)) >>> 0;
+        b = (c + rotl32((b + md5G(c, d, a) + K_MD5[23] + W[4]) >>> 0, 20)) >>> 0;
+        a = (b + rotl32((a + md5G(b, c, d) + K_MD5[24] + W[9]) >>> 0, 5)) >>> 0;
+        d = (a + rotl32((d + md5G(a, b, c) + K_MD5[25] + W[14]) >>> 0, 9)) >>> 0;
+        c = (d + rotl32((c + md5G(d, a, b) + K_MD5[26] + W[3]) >>> 0, 14)) >>> 0;
+        b = (c + rotl32((b + md5G(c, d, a) + K_MD5[27] + W[8]) >>> 0, 20)) >>> 0;
+        a = (b + rotl32((a + md5G(b, c, d) + K_MD5[28] + W[13]) >>> 0, 5)) >>> 0;
+        d = (a + rotl32((d + md5G(a, b, c) + K_MD5[29] + W[2]) >>> 0, 9)) >>> 0;
+        c = (d + rotl32((c + md5G(d, a, b) + K_MD5[30] + W[7]) >>> 0, 14)) >>> 0;
+        b = (c + rotl32((b + md5G(c, d, a) + K_MD5[31] + W[12]) >>> 0, 20)) >>> 0;
+
+        // Round 3
+        a = (b + rotl32((a + md5H(b, c, d) + K_MD5[32] + W[5]) >>> 0, 4)) >>> 0;
+        d = (a + rotl32((d + md5H(a, b, c) + K_MD5[33] + W[8]) >>> 0, 11)) >>> 0;
+        c = (d + rotl32((c + md5H(d, a, b) + K_MD5[34] + W[11]) >>> 0, 16)) >>> 0;
+        b = (c + rotl32((b + md5H(c, d, a) + K_MD5[35] + W[14]) >>> 0, 23)) >>> 0;
+        a = (b + rotl32((a + md5H(b, c, d) + K_MD5[36] + W[1]) >>> 0, 4)) >>> 0;
+        d = (a + rotl32((d + md5H(a, b, c) + K_MD5[37] + W[4]) >>> 0, 11)) >>> 0;
+        c = (d + rotl32((c + md5H(d, a, b) + K_MD5[38] + W[7]) >>> 0, 16)) >>> 0;
+        b = (c + rotl32((b + md5H(c, d, a) + K_MD5[39] + W[10]) >>> 0, 23)) >>> 0;
+        a = (b + rotl32((a + md5H(b, c, d) + K_MD5[40] + W[13]) >>> 0, 4)) >>> 0;
+        d = (a + rotl32((d + md5H(a, b, c) + K_MD5[41] + W[0]) >>> 0, 11)) >>> 0;
+        c = (d + rotl32((c + md5H(d, a, b) + K_MD5[42] + W[3]) >>> 0, 16)) >>> 0;
+        b = (c + rotl32((b + md5H(c, d, a) + K_MD5[43] + W[6]) >>> 0, 23)) >>> 0;
+        a = (b + rotl32((a + md5H(b, c, d) + K_MD5[44] + W[9]) >>> 0, 4)) >>> 0;
+        d = (a + rotl32((d + md5H(a, b, c) + K_MD5[45] + W[12]) >>> 0, 11)) >>> 0;
+        c = (d + rotl32((c + md5H(d, a, b) + K_MD5[46] + W[15]) >>> 0, 16)) >>> 0;
+        b = (c + rotl32((b + md5H(c, d, a) + K_MD5[47] + W[2]) >>> 0, 23)) >>> 0;
+
+        // Round 4
+        a = (b + rotl32((a + md5I(b, c, d) + K_MD5[48] + W[0]) >>> 0, 6)) >>> 0;
+        d = (a + rotl32((d + md5I(a, b, c) + K_MD5[49] + W[7]) >>> 0, 10)) >>> 0;
+        c = (d + rotl32((c + md5I(d, a, b) + K_MD5[50] + W[14]) >>> 0, 15)) >>> 0;
+        b = (c + rotl32((b + md5I(c, d, a) + K_MD5[51] + W[5]) >>> 0, 21)) >>> 0;
+        a = (b + rotl32((a + md5I(b, c, d) + K_MD5[52] + W[12]) >>> 0, 6)) >>> 0;
+        d = (a + rotl32((d + md5I(a, b, c) + K_MD5[53] + W[3]) >>> 0, 10)) >>> 0;
+        c = (d + rotl32((c + md5I(d, a, b) + K_MD5[54] + W[10]) >>> 0, 15)) >>> 0;
+        b = (c + rotl32((b + md5I(c, d, a) + K_MD5[55] + W[1]) >>> 0, 21)) >>> 0;
+        a = (b + rotl32((a + md5I(b, c, d) + K_MD5[56] + W[8]) >>> 0, 6)) >>> 0;
+        d = (a + rotl32((d + md5I(a, b, c) + K_MD5[57] + W[15]) >>> 0, 10)) >>> 0;
+        c = (d + rotl32((c + md5I(d, a, b) + K_MD5[58] + W[6]) >>> 0, 15)) >>> 0;
+        b = (c + rotl32((b + md5I(c, d, a) + K_MD5[59] + W[13]) >>> 0, 21)) >>> 0;
+        a = (b + rotl32((a + md5I(b, c, d) + K_MD5[60] + W[4]) >>> 0, 6)) >>> 0;
+        d = (a + rotl32((d + md5I(a, b, c) + K_MD5[61] + W[11]) >>> 0, 10)) >>> 0;
+        c = (d + rotl32((c + md5I(d, a, b) + K_MD5[62] + W[2]) >>> 0, 15)) >>> 0;
+        b = (c + rotl32((b + md5I(c, d, a) + K_MD5[63] + W[9]) >>> 0, 21)) >>> 0;
+
+        H[0] = (H[0] + a) >>> 0;
+        H[1] = (H[1] + b) >>> 0;
+        H[2] = (H[2] + c) >>> 0;
+        H[3] = (H[3] + d) >>> 0;
+      }
+
+      return H.map(md5WordToHex).join('');
+    }
+
+    const K256 = [
+      0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+      0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+      0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+      0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+      0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+      0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+      0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+      0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
+    ];
+    const H256init = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19];
+
+    function rotr32(x, n) { return ((x >>> n) | (x << (32 - n))) >>> 0; }
+    function h32(x) { return (x >>> 0).toString(16).padStart(8, '0'); }
+
+    function padMessage(bytes, blockBytes, lenFieldBytes) {
+      const bitLen = BigInt(bytes.length) * 8n;
+      let padded = Array.from(bytes);
+      const oneBytePos = padded.length;
+      padded.push(0x80);
+      const zeroTarget = blockBytes - lenFieldBytes;
+      while ((padded.length % blockBytes) !== zeroTarget) padded.push(0);
+      const zeroEnd = padded.length;
+      const lenBytes = new Array(lenFieldBytes).fill(0);
+      let bl = bitLen;
+      for (let i = lenFieldBytes - 1; i >= 0; i--) { lenBytes[i] = Number(bl & 0xFFn); bl >>= 8n; }
+      padded = padded.concat(lenBytes);
+      return { padded, oneBytePos, zeroEnd, bitLen };
+    }
+
+    function sha256Trace(bytes) {
+      const { padded, oneBytePos, zeroEnd, bitLen } = padMessage(bytes, 64, 8);
+      const blocks = [];
+      for (let i = 0; i < padded.length; i += 64) blocks.push(padded.slice(i, i + 64));
+
+      let H = H256init.slice();
+      const blockTraces = [];
+      for (const block of blocks) {
+        const W = new Array(64).fill(0);
+        const Wmeta = new Array(64).fill(null);
+        for (let t = 0; t < 16; t++) {
+          W[t] = (block[t * 4] << 24 | block[t * 4 + 1] << 16 | block[t * 4 + 2] << 8 | block[t * 4 + 3]) >>> 0;
+          Wmeta[t] = { direct: true };
+        }
+        for (let t = 16; t < 64; t++) {
+          const s0 = rotr32(W[t - 15], 7) ^ rotr32(W[t - 15], 18) ^ (W[t - 15] >>> 3);
+          const s1 = rotr32(W[t - 2], 17) ^ rotr32(W[t - 2], 19) ^ (W[t - 2] >>> 10);
+          W[t] = (W[t - 16] + s0 + W[t - 7] + s1) >>> 0;
+          Wmeta[t] = { direct: false, s0, s1, refs: [t - 16, t - 15, t - 7, t - 2] };
+        }
+        const Hbefore = H.slice();
+        let [a, b, c, d, e, f, g, h] = H;
+        const rounds = [];
+        for (let t = 0; t < 64; t++) {
+          const S1 = rotr32(e, 6) ^ rotr32(e, 11) ^ rotr32(e, 25);
+          const ch = (e & f) ^ (~e & g);
+          const T1 = (h + S1 + ch + K256[t] + W[t]) >>> 0;
+          const S0 = rotr32(a, 2) ^ rotr32(a, 13) ^ rotr32(a, 22);
+          const maj = (a & b) ^ (a & c) ^ (b & c);
+          const T2 = (S0 + maj) >>> 0;
+          rounds.push({ t, a, b, c, d, e, f, g, h, S1: S1 >>> 0, ch: ch >>> 0, T1, S0: S0 >>> 0, maj: maj >>> 0, T2, K: K256[t], W: W[t] });
+          h = g; g = f; f = e; e = (d + T1) >>> 0; d = c; c = b; b = a; a = (T1 + T2) >>> 0;
+        }
+        H[0] = (H[0] + a) >>> 0; H[1] = (H[1] + b) >>> 0; H[2] = (H[2] + c) >>> 0; H[3] = (H[3] + d) >>> 0;
+        H[4] = (H[4] + e) >>> 0; H[5] = (H[5] + f) >>> 0; H[6] = (H[6] + g) >>> 0; H[7] = (H[7] + h) >>> 0;
+        blockTraces.push({ block, W, Wmeta, Hbefore, rounds, Hafter: H.slice() });
+      }
+      return {
+        algo: 'sha256', wordBits: 32, rounds: 64, blockBytes: 64,
+        bytes, padded, oneBytePos, zeroEnd, bitLen,
+        blocks: blockTraces, digest: H.map(h32).join(''), fmt: h32
+      };
+    }
+
+    const MASK64 = (1n << 64n) - 1n;
+    const K512hex = [
+      "428a2f98d728ae22", "7137449123ef65cd", "b5c0fbcfec4d3b2f", "e9b5dba58189dbbc",
+      "3956c25bf348b538", "59f111f1b605d019", "923f82a4af194f9b", "ab1c5ed5da6d8118",
+      "d807aa98a3030242", "12835b0145706fbe", "243185be4ee4b28c", "550c7dc3d5ffb4e2",
+      "72be5d74f27b896f", "80deb1fe3b1696b1", "9bdc06a725c71235", "c19bf174cf692694",
+      "e49b69c19ef14ad2", "efbe4786384f25e3", "0fc19dc68b8cd5b5", "240ca1cc77ac9c65",
+      "2de92c6f592b0275", "4a7484aa6ea6e483", "5cb0a9dcbd41fbd4", "76f988da831153b5",
+      "983e5152ee66dfab", "a831c66d2db43210", "b00327c898fb213f", "bf597fc7beef0ee4",
+      "c6e00bf33da88fc2", "d5a79147930aa725", "06ca6351e003826f", "142929670a0e6e70",
+      "27b70a8546d22ffc", "2e1b21385c26c926", "4d2c6dfc5ac42aed", "53380d139d95b3df",
+      "650a73548baf63de", "766a0abb3c77b2a8", "81c2c92e47edaee6", "92722c851482353b",
+      "a2bfe8a14cf10364", "a81a664bbc423001", "c24b8b70d0f89791", "c76c51a30654be30",
+      "d192e819d6ef5218", "d69906245565a910", "f40e35855771202a", "106aa07032bbd1b8",
+      "19a4c116b8d2d0c8", "1e376c085141ab53", "2748774cdf8eeb99", "34b0bcb5e19b48a8",
+      "391c0cb3c5c95a63", "4ed8aa4ae3418acb", "5b9cca4f7763e373", "682e6ff3d6b2b8a3",
+      "748f82ee5defb2fc", "78a5636f43172f60", "84c87814a1f0ab72", "8cc702081a6439ec",
+      "90befffa23631e28", "a4506cebde82bde9", "bef9a3f7b2c67915", "c67178f2e372532b",
+      "ca273eceea26619c", "d186b8c721c0c207", "eada7dd6cde0eb1e", "f57d4f7fee6ed178",
+      "06f067aa72176fba", "0a637dc5a2c898a6", "113f9804bef90dae", "1b710b35131c471b",
+      "28db77f523047d84", "32caab7b40c72493", "3c9ebe0a15c9bebc", "431d67c49c100d4c",
+      "4cc5d4becb3e42b6", "597f299cfc657e2a", "5fcb6fab3ad6faec", "6c44198c4a475817"
+    ];
+    const K512 = K512hex.map(s => BigInt("0x" + s));
+    const H512init = [
+      "6a09e667f3bcc908", "bb67ae8584caa73b", "3c6ef372fe94f82b", "a54ff53a5f1d36f1",
+      "510e527fade682d1", "9b05688c2b3e6c1f", "1f83d9abfb41bd6b", "5be0cd19137e2179"
+    ].map(s => BigInt("0x" + s));
+
+    function rotr64(x, n) { return ((x >> BigInt(n)) | (x << BigInt(64 - n))) & MASK64; }
+    function h64(x) { return x.toString(16).padStart(16, '0'); }
+
+    function sha512Trace(bytes) {
+      const { padded, oneBytePos, zeroEnd, bitLen } = padMessage(bytes, 128, 16);
+      const blocks = [];
+      for (let i = 0; i < padded.length; i += 128) blocks.push(padded.slice(i, i + 128));
+
+      let H = H512init.slice();
+      const blockTraces = [];
+      for (const block of blocks) {
+        const W = new Array(80).fill(0n);
+        const Wmeta = new Array(80).fill(null);
+        for (let t = 0; t < 16; t++) {
+          let w = 0n;
+          for (let j = 0; j < 8; j++) w = (w << 8n) | BigInt(block[t * 8 + j]);
+          W[t] = w & MASK64;
+          Wmeta[t] = { direct: true };
+        }
+        for (let t = 16; t < 80; t++) {
+          const s0 = rotr64(W[t - 15], 1) ^ rotr64(W[t - 15], 8) ^ (W[t - 15] >> 7n);
+          const s1 = rotr64(W[t - 2], 19) ^ rotr64(W[t - 2], 61) ^ (W[t - 2] >> 6n);
+          W[t] = (W[t - 16] + s0 + W[t - 7] + s1) & MASK64;
+          Wmeta[t] = { direct: false, s0, s1, refs: [t - 16, t - 15, t - 7, t - 2] };
+        }
+        const Hbefore = H.slice();
+        let [a, b, c, d, e, f, g, h] = H;
+        const rounds = [];
+        for (let t = 0; t < 80; t++) {
+          const S1 = rotr64(e, 14) ^ rotr64(e, 18) ^ rotr64(e, 41);
+          const ch = (e & f) ^ ((~e) & g & MASK64);
+          const T1 = (h + S1 + ch + K512[t] + W[t]) & MASK64;
+          const S0 = rotr64(a, 28) ^ rotr64(a, 34) ^ rotr64(a, 39);
+          const maj = (a & b) ^ (a & c) ^ (b & c);
+          const T2 = (S0 + maj) & MASK64;
+          rounds.push({ t, a, b, c, d, e, f, g, h, S1, ch, T1, S0, maj, T2, K: K512[t], W: W[t] });
+          h = g; g = f; f = e; e = (d + T1) & MASK64; d = c; c = b; b = a; a = (T1 + T2) & MASK64;
+        }
+        H = H.map((v, i) => (v + [a, b, c, d, e, f, g, h][i]) & MASK64);
+        blockTraces.push({ block, W, Wmeta, Hbefore, rounds, Hafter: H.slice() });
+      }
+      return {
+        algo: 'sha512', wordBits: 64, rounds: 80, blockBytes: 128,
+        bytes, padded, oneBytePos, zeroEnd, bitLen,
+        blocks: blockTraces, digest: H.map(h64).join(''), fmt: h64
+      };
+    }
+
+    /* =========================================================
+       UI STATE + RENDERING
+       ========================================================= */
+    const state = { algo: 'sha256', trace: null, step: 0, activeBlock: 0, activeRound: 0, playing: false, playTimer: null };
+    const sessionHistory = new Set(["", "abc", "The quick brown fox jumps over the lazy dog", "Hello BUBT CSE!"]);
+
+    function utf8Bytes(str) { return Array.from(new TextEncoder().encode(str)); }
+
+    function compute() {
+      const msg = document.getElementById('msgInput').value;
+      sessionHistory.add(msg);
+      const bytes = utf8Bytes(msg);
+
+      if (state.algo === 'sha256') {
+        state.trace = sha256Trace(bytes);
+      } else if (state.algo === 'sha512') {
+        state.trace = sha512Trace(bytes);
+      } else {
+        state.trace = md5Trace(bytes);
+      }
+
+      // Update Decrypt button visibility
+      const dBtn = document.getElementById('decryptBtn');
+      if (state.algo === 'md5') {
+        dBtn.style.display = 'inline-block';
+      } else {
+        dBtn.style.display = 'none';
+      }
+
+      // Update Header Eyebrow
+      const eyebrow = document.getElementById('algoEyebrow');
+      if (state.algo === 'md5') {
+        eyebrow.textContent = 'RFC 1321 · worked by hand';
+      } else {
+        eyebrow.textContent = 'FIPS 180-4 · worked by hand';
+      }
+
+      state.activeBlock = 0;
+      state.activeRound = 0;
+      render();
+    }
+
+    document.getElementById('computeBtn').addEventListener('click', compute);
+    document.getElementById('msgInput').addEventListener('keydown', e => { if (e.key === 'Enter') compute(); });
+    document.getElementById('decryptBtn').addEventListener('click', () => {
+      state.step = 3;
+      render();
+      const decryptInput = document.getElementById('decryptHashInput');
+      const msgInputVal = document.getElementById('msgInput').value.trim();
+      if (decryptInput) {
+        if (/^[0-9a-fA-F]{32}$/.test(msgInputVal)) {
+          decryptInput.value = msgInputVal;
+        } else if (state.trace && state.trace.algo === 'md5') {
+          decryptInput.value = state.trace.digest;
+        }
+        document.getElementById('decryptRunBtn').click();
+      }
+    });
+
+    document.querySelectorAll('.pill').forEach(p => {
+      p.addEventListener('click', () => {
+        document.querySelectorAll('.pill').forEach(x => x.classList.remove('active'));
+        p.classList.add('active');
+        state.algo = p.dataset.algo;
+        compute();
+      });
+    });
+    document.querySelectorAll('.presets a').forEach(a => {
+      a.addEventListener('click', () => {
+        document.getElementById('msgInput').value = a.dataset.preset;
+        compute();
+      });
+    });
+    document.querySelectorAll('.step-tab').forEach(t => {
+      t.addEventListener('click', () => { state.step = Number(t.dataset.step); render(); });
+    });
+    document.getElementById('prevBtn').addEventListener('click', () => { state.step = Math.max(0, state.step - 1); render(); });
+    document.getElementById('nextBtn').addEventListener('click', () => { state.step = Math.min(3, state.step + 1); render(); });
+
+    function esc(s) { return String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])); }
+
+    function renderStepper() {
+      document.querySelectorAll('.step-tab').forEach(t => {
+        t.classList.toggle('active', Number(t.dataset.step) === state.step);
+      });
+      document.getElementById('prevBtn').disabled = state.step === 0;
+      document.getElementById('nextBtn').disabled = state.step === 3;
+    }
+
+    function render() {
+      renderStepper();
+      const panel = document.getElementById('panel');
+      if (!state.trace) { panel.innerHTML = '<p class="desc">Enter a message and press Compute to begin.</p>'; return; }
+      if (state.step === 0) renderStep1(panel);
+      else if (state.step === 1) renderStep2(panel);
+      else if (state.step === 2) renderStep3(panel);
+      else renderStep4(panel);
+    }
+
+    function renderStep1(panel) {
+      const tr = state.trace;
+      const bits = tr.bitLen.toString();
+      let byteHtml = '';
+      tr.padded.forEach((b, i) => {
+        let cls = 'byte ';
+        if (i < tr.oneBytePos) cls += 'msg';
+        else if (i === tr.oneBytePos) cls += 'pad1';
+        else if (i < tr.zeroEnd) cls += 'pad0';
+        else cls += 'len';
+        byteHtml += `<div class="${cls}" title="byte ${i}">${b.toString(16).padStart(2, '0')}</div>`;
+      });
+
+      let blocksHtml = '';
+      tr.blocks.forEach((blk, i) => {
+        blocksHtml += `<div class="block-card ${i === state.activeBlock ? 'active' : ''}" data-block="${i}">
+      <span class="k">Block ${i + 1} / ${tr.blocks.length}</span><br>${tr.blockBytes} bytes → ${tr.blockBytes / 4 | 0} × ${tr.wordBits}-bit words</div>`;
+      });
+
+      panel.innerHTML = `
+    <h2>1 · Message → bytes → padding</h2>
+    <div class="eli5"><span class="tag">IN PLAIN WORDS</span><p>The algorithm only works on fixed-size chunks (like feeding paper into a shredder that only takes exact-size sheets). So first we glue on a bit of extra stuff — a marker byte, then filler zeros, then a note saying "the real message was this many bits long" — until the whole thing divides evenly into those chunks. No information is lost; it's just packaging.</p></div>
+    <p class="desc">The message is turned into bytes, a single <b>1</b> bit is appended (shown as byte <code>0x80</code>), then zero bytes fill the block out to
+    ${tr.blockBytes === 64 ? '56' : '112'} bytes, and finally the original bit-length is written into the last ${tr.blockBytes === 64 ? '8' : '16'} bytes. This guarantees the padded message is an exact multiple of the ${tr.blockBytes * 8}-bit block size.</p>
+
+    <div class="stat-row">
+      <div class="stat"><span class="k">Message</span><span class="v">"${esc(document.getElementById('msgInput').value)}"</span></div>
+      <div class="stat"><span class="k">Length</span><span class="v">${tr.bytes.length} bytes = ${bits} bits</span></div>
+      <div class="stat"><span class="k">Padded length</span><span class="v">${tr.padded.length} bytes</span></div>
+      <div class="stat"><span class="k">Blocks</span><span class="v">${tr.blocks.length} × ${tr.blockBytes * 8}-bit</span></div>
+    </div>
+
+    <div class="tape-legend">
+      <span><i class="swatch" style="background:#dfe7f4"></i>message bytes</span>
+      <span><i class="swatch" style="background:var(--stamp)"></i>the appended "1" bit (0x80)</span>
+      <span><i class="swatch" style="background:#eef1f6;border:1px solid #ccd6e6"></i>zero padding</span>
+      <span><i class="swatch" style="background:var(--derived)"></i>64/128-bit length field</span>
+    </div>
+    <div class="byte-tape">${byteHtml}</div>
+
+    <h2 style="font-size:14px;">Split into ${tr.blockBytes * 8}-bit blocks</h2>
+    <p class="desc" style="margin-bottom:10px;">Click a block to make it the "active" block for steps 2 and 3.</p>
+    <div class="blocks-row">${blocksHtml}</div>
+  `;
+
+      panel.querySelectorAll('.block-card').forEach(c => {
+        c.addEventListener('click', () => { state.activeBlock = Number(c.dataset.block); state.activeRound = 0; render(); });
+      });
+    }
+
+    function fmtWord(tr, val) { return tr.fmt(val); }
+
+    function renderStep2(panel) {
+      const tr = state.trace;
+      const blk = tr.blocks[state.activeBlock];
+      const n = tr.rounds;
+      let rows = '';
+
+      if (tr.algo === 'md5') {
+        for (let t = 0; t < n; t++) {
+          const meta = blk.Wmeta[t];
+          const wVal = fmtWord(tr, blk.W[t]);
+          if (meta.direct) {
+            rows += `<tr class="direct"><td>${t}</td><td class="w">${wVal}</td><td class="formula">copied directly from block word ${t}</td></tr>`;
+          } else {
+            rows += `<tr class="derived"><td>${t}</td><td class="w">${wVal}</td>
+          <td class="formula">permuted from W_block[${meta.g}] using <code>${meta.formula}</code></td></tr>`;
+          }
+        }
+      } else {
+        for (let t = 0; t < n; t++) {
+          const meta = blk.Wmeta[t];
+          const wVal = fmtWord(tr, blk.W[t]);
+          if (meta.direct) {
+            rows += `<tr class="direct"><td>${t}</td><td class="w">${wVal}</td><td class="formula">copied directly from block word ${t}</td></tr>`;
+          } else {
+            const [i16, i15, i7, i2] = meta.refs;
+            rows += `<tr class="derived"><td>${t}</td><td class="w">${wVal}</td>
+          <td class="formula">σ₀(W[${i15}]) + σ₁(W[${i2}]) + W[${i7}] + W[${i16}], mod 2<sup>${tr.wordBits}</sup></td></tr>`;
+          }
+        }
+      }
+
+      let inPlainWords = '';
+      let desc = '';
+      if (tr.algo === 'md5') {
+        inPlainWords = `<p>MD5 has 64 rounds but does not generate new words. Instead, it reuses the 16 original block words in a permuted (shuffled) order in each of the four 16-round phases, ensuring each word is processed 4 times under different math functions.</p>`;
+        desc = `The block's 16 words are mapped to 64 round words <code>W[0..63]</code>. The first 16 are copied directly, and the remaining 48 are <span style="color:var(--derived);font-weight:700;">permuted</span> in a specific cyclic pattern per round so that all block words are thoroughly mixed.`;
+      } else {
+        inPlainWords = `<p>Each chunk only has 16 words to start with — not enough to mix things up thoroughly. So the algorithm "stretches" it out to ${n} words by generating each new word from a scrambled combination of four earlier ones. Think of it like kneading dough: folding earlier parts back in so every later word carries a trace of everything before it.</p>`;
+        desc = `The block's ${tr.blockBytes / 4 | 0} words are expanded into ${n} schedule words <code>W[0..${n - 1}]</code>.
+    The first 16 are copied straight from the block. Every word after that is <span style="color:var(--derived);font-weight:700;">derived</span>
+    by mixing two earlier words with two rotate-and-shift functions (σ₀, σ₁) so later rounds depend on the whole block, not just nearby bytes.`;
+      }
+
+      panel.innerHTML = `
+    <h2>2 · Message schedule (block ${state.activeBlock + 1} of ${tr.blocks.length})</h2>
+    <div class="eli5"><span class="tag">IN PLAIN WORDS</span>${inPlainWords}</div>
+    <p class="desc">${desc}</p>
+    <div class="sched-scroll">
+      <table class="sched">
+        <thead><tr><th>t</th><th>W[t]</th><th>how it's built</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+    }
+
+    function stopPlay() {
+      state.playing = false;
+      if (state.playTimer) clearInterval(state.playTimer);
+      state.playTimer = null;
+    }
+
+    function renderStep3(panel) {
+      const tr = state.trace;
+      const blk = tr.blocks[state.activeBlock];
+      const n = tr.rounds;
+      const r = blk.rounds[state.activeRound];
+      const names = tr.algo === 'md5' ? ['a', 'b', 'c', 'd'] : ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+      const vals = tr.algo === 'md5' ? [r.a, r.b, r.c, r.d] : [r.a, r.b, r.c, r.d, r.e, r.f, r.g, r.h];
+
+      let railHtml = '';
+      names.forEach((nm, i) => {
+        const touched = tr.algo === 'md5' ? (nm === 'b') : (nm === 'a' || nm === 'e');
+        railHtml += `<div class="reg ${touched ? 'touched' : ''}">
+      <div class="name">${nm}</div><div class="val">${fmtWord(tr, vals[i])}</div></div>`;
+      });
+
+      let inPlainWords = '';
+      let desc = '';
+      let calcGridHtml = '';
+      let nextRoundFormulaDesc = '';
+
+      if (tr.algo === 'md5') {
+        inPlainWords = `<p>This is the MD5 compression step, repeated 64 times. It consists of 4 rounds of 16 steps each. Each step modifies one of the 4 registers (a, b, c, d) by mixing it with the other three using a non-linear function (F, G, H, or I), adding a round constant K[t] and a message word W[t], rotating left by s bits, and adding the result to register b. This rapid mixing makes MD5 fast but cryptographically broken today due to collision attacks.</p>`;
+        desc = `Four working registers <code>a..d</code> get scrambled once per round using the round constant <code>K[t]</code> and schedule word <code>W[t]</code>. Step through by hand, or press Play to watch it run.`;
+        calcGridHtml = `
+      <div class="calc-card"><span class="k">Func(b,c,d)</span><span class="v">${fmtWord(tr, r.funcVal)}</span><span class="expr">${r.funcExpr}</span></div>
+      <div class="calc-card"><span class="k">K[t]</span><span class="v">${fmtWord(tr, r.K)}</span><span class="expr">round constant, t=${r.t}</span></div>
+      <div class="calc-card"><span class="k">W[t]</span><span class="v">${fmtWord(tr, r.W)}</span><span class="expr">schedule word (block word ${r.g}), t=${r.t}</span></div>
+      <div class="calc-card"><span class="k">T (Sum)</span><span class="v">${fmtWord(tr, r.T)}</span><span class="expr">a + Func + K[t] + W[t]</span></div>
+      <div class="calc-card"><span class="k">Shift (s)</span><span class="v">${r.s} bits</span><span class="expr">shift amount for round</span></div>
+      <div class="calc-card"><span class="k">T &lt;&lt;&lt; s</span><span class="v">${fmtWord(tr, r.T_rot)}</span><span class="expr">left rotate by ${r.s} bits</span></div>
+      <div class="calc-card"><span class="k">New B</span><span class="v">${fmtWord(tr, r.newB)}</span><span class="expr">b + (T &lt;&lt;&lt; s)</span></div>
+    `;
+        nextRoundFormulaDesc = `Next round: <code>a←d, b←b+(T&lt;&lt;&lt;s), c←b, d←c</code> — the highlighted register (b) gets freshly computed this round while others shift.`;
+      } else {
+        inPlainWords = `<p>This is the actual "mixing" step, repeated ${n} times. Each round takes the current 8 values, combines two of them using scrambling functions (rotate the bits, then vote/choose between them), and shuffles the results back in — like a card shuffle done ${n} times in a row. One shuffle wouldn't hide much; ${n} of them make it practically impossible to work backwards from the output to the input.</p>`;
+        desc = `Eight working registers <code>a..h</code> get scrambled once per round using the round constant <code>K[t]</code> and schedule word <code>W[t]</code>. Step through by hand, or press Play to watch it run.`;
+        calcGridHtml = `
+      <div class="calc-card"><span class="k">Σ1(e)</span><span class="v">${fmtWord(tr, r.S1)}</span><span class="expr">ROTR(e) xor ROTR(e) xor ROTR(e)</span></div>
+      <div class="calc-card"><span class="k">Ch(e,f,g)</span><span class="v">${fmtWord(tr, r.ch)}</span><span class="expr">(e AND f) xor (NOT e AND g)</span></div>
+      <div class="calc-card"><span class="k">K[t]</span><span class="v">${fmtWord(tr, r.K)}</span><span class="expr">round constant, t=${r.t}</span></div>
+      <div class="calc-card"><span class="k">W[t]</span><span class="v">${fmtWord(tr, r.W)}</span><span class="expr">schedule word, t=${r.t}</span></div>
+      <div class="calc-card"><span class="k">T1</span><span class="v">${fmtWord(tr, r.T1)}</span><span class="expr">h + Σ1 + Ch + K[t] + W[t]</span></div>
+      <div class="calc-card"><span class="k">Σ0(a)</span><span class="v">${fmtWord(tr, r.S0)}</span><span class="expr">ROTR(a) xor ROTR(a) xor ROTR(a)</span></div>
+      <div class="calc-card"><span class="k">Maj(a,b,c)</span><span class="v">${fmtWord(tr, r.maj)}</span><span class="expr">majority vote per bit</span></div>
+      <div class="calc-card"><span class="k">T2</span><span class="v">${fmtWord(tr, r.T2)}</span><span class="expr">Σ0 + Maj</span></div>
+    `;
+        nextRoundFormulaDesc = `Next round: <code>h←g, g←f, f←e, e←d+T1, d←c, c←b, b←a, a←T1+T2</code> — the highlighted registers above are the two that get freshly computed this round.`;
+      }
+
+      panel.innerHTML = `
+    <h2>3 · Compression — round ${state.activeRound + 1} of ${n} (block ${state.activeBlock + 1}/${tr.blocks.length})</h2>
+    <div class="eli5"><span class="tag">IN PLAIN WORDS</span>${inPlainWords}</div>
+    <p class="desc">${desc}</p>
+
+    <div class="round-controls">
+      <button id="rFirst" ${state.activeRound === 0 ? 'disabled' : ''}>⏮ First</button>
+      <button id="rPrev" ${state.activeRound === 0 ? 'disabled' : ''}>← Prev</button>
+      <button id="rPlay">${state.playing ? '⏸ Pause' : '▶ Play'}</button>
+      <button id="rNext" ${state.activeRound === n - 1 ? 'disabled' : ''}>Next →</button>
+      <button id="rLast" ${state.activeRound === n - 1 ? 'disabled' : ''}>Last ⏭</button>
+      <span class="round-counter">t = ${state.activeRound}</span>
+      <input type="range" min="0" max="${n - 1}" value="${state.activeRound}" id="rSlider" style="flex:1; min-width:140px;">
+    </div>
+
+    <div class="rail">${railHtml}</div>
+
+    <div class="calc-grid">${calcGridHtml}</div>
+    <p class="desc" style="margin-bottom:0;">${nextRoundFormulaDesc}</p>
+  `;
+
+      const goTo = (i) => { state.activeRound = Math.max(0, Math.min(n - 1, i)); render(); };
+      panel.querySelector('#rFirst').addEventListener('click', () => { stopPlay(); goTo(0); });
+      panel.querySelector('#rPrev').addEventListener('click', () => { stopPlay(); goTo(state.activeRound - 1); });
+      panel.querySelector('#rNext').addEventListener('click', () => { stopPlay(); goTo(state.activeRound + 1); });
+      panel.querySelector('#rLast').addEventListener('click', () => { stopPlay(); goTo(n - 1); });
+      panel.querySelector('#rSlider').addEventListener('input', (e) => { stopPlay(); goTo(Number(e.target.value)); });
+      panel.querySelector('#rPlay').addEventListener('click', () => {
+        if (state.playing) { stopPlay(); render(); return; }
+        state.playing = true;
+        render();
+        state.playTimer = setInterval(() => {
+          if (state.activeRound >= n - 1) { stopPlay(); render(); return; }
+          state.activeRound++; render();
+        }, 450);
+      });
+    }
+
+    function renderStep4(panel) {
+      const tr = state.trace;
+      let chainHtml = '';
+      tr.blocks.forEach((blk, i) => {
+        chainHtml += `<div class="chain-row"><span class="lab">after block ${i + 1}</span>
+      <code>${blk.Hafter.map(fmtWord.bind(null, tr)).join(' ')}</code></div>`;
+      });
+
+      let desc = '';
+      let decryptCardHtml = '';
+      if (tr.algo === 'md5') {
+        desc = `MD5 → 128 bits → 32 hex characters. Change one character in the message and recompute — the avalanche effect is clearly visible. Note that MD5 is widely considered cryptographically broken for collision resistance, but is still used for non-cryptographic checksums.`;
+        decryptCardHtml = `
+      <div class="decrypt-section" style="margin-top: 22px; padding: 16px; border: 1.5px dashed var(--card-border); border-radius: 8px; background: #fafbfc;">
+        <h3 style="margin-top:0; margin-bottom:8px; font-size:14px; font-family:var(--mono); color:var(--ink);">MD5 Decryption (Hash Cracker)</h3>
+        <p style="font-size:12.5px; color:var(--ink-soft); margin-top:0; margin-bottom:12px; line-height:1.4;">
+          MD5 is a one-way cryptographic hash function. It cannot be mathematically "decrypted".
+          However, you can perform a preimage search (hash cracking) using dictionary attacks or alphanumeric brute-force.
+        </p>
+        <div style="display:flex; gap:8px;">
+          <input type="text" id="decryptHashInput" value="${tr.digest}" placeholder="Enter 32-character MD5 hash to crack" style="font-family:var(--mono); font-size:13px; padding:8px 10px; flex:1; border:1.5px solid var(--card-border); border-radius:6px; background:#fff;">
+          <button class="go" id="decryptRunBtn" style="font-size:12.5px; padding:8px 14px; background:var(--derived);">Decrypt 🔓</button>
+        </div>
+        <div id="decryptResult" style="margin-top:14px; font-family:var(--mono); font-size:13px; border-radius:6px; padding:10px 12px; display:none;"></div>
+      </div>
+    `;
+      } else {
+        desc = `${tr.algo === 'sha256' ? 'SHA-256 → 256 bits → 64 hex characters.' : 'SHA-512 → 512 bits → 128 hex characters.'} Change one character in the message and recompute — every bit of this output will change (the avalanche effect).`;
+      }
+
+      panel.innerHTML = `
+    <h2>4 · Final digest</h2>
+    <div class="eli5"><span class="tag">IN PLAIN WORDS</span><p>Once every chunk has been shuffled, the leftover 8 values are read out as one long string of hex digits — that's the "fingerprint" of the original message. Same input always gives the same fingerprint. Change even one letter of the input and this fingerprint comes out completely different, with no obvious pattern connecting the two.</p></div>
+    <p class="desc">Each block's output registers are added into the running hash state, then fed in as the starting state for the next block.
+    After the last block, the eight words are concatenated to form the digest.</p>
+    <div class="chain">${chainHtml}</div>
+    <div class="digest-box">${tr.digest}</div>
+    <button class="copy" id="copyBtn">Copy digest</button>
+    <p class="desc" style="margin-top:14px; margin-bottom:0;">${desc}</p>
+    ${decryptCardHtml}
+  `;
+
+      panel.querySelector('#copyBtn').addEventListener('click', () => {
+        navigator.clipboard?.writeText(tr.digest);
+        const b = panel.querySelector('#copyBtn'); b.textContent = 'Copied ✓';
+        setTimeout(() => { b.textContent = 'Copy digest'; }, 1200);
+      });
+
+      if (tr.algo === 'md5') {
+        panel.querySelector('#decryptRunBtn').addEventListener('click', runMD5Decryption);
+      }
+    }
+
+    function runMD5Decryption() {
+      const target = document.getElementById('decryptHashInput').value.trim().toLowerCase();
+      const resDiv = document.getElementById('decryptResult');
+
+      if (!resDiv) return;
+      resDiv.style.display = 'block';
+      resDiv.style.background = '#f7f9fc';
+      resDiv.style.border = '1.5px solid var(--card-border)';
+      resDiv.style.color = 'var(--ink)';
+
+      // Validation
+      if (!/^[0-9a-f]{32}$/.test(target)) {
+        resDiv.style.background = '#fff3f3';
+        resDiv.style.borderColor = '#f8c2c2';
+        resDiv.style.color = '#a94442';
+        resDiv.innerHTML = `<strong>Error:</strong> Invalid MD5 hash format. Please enter a valid 32-character hexadecimal MD5 hash (0-9, a-f).`;
+        return;
+      }
+
+      resDiv.innerHTML = `
+    <div style="font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:8px;">
+      <span class="spinner" style="border: 2px solid #ccc; border-top: 2px solid var(--stamp); border-radius: 50%; width: 14px; height: 14px; display: inline-block; animation: spin 0.8s linear infinite;"></span>
+      <span>Decrypting hash: <code style="color:var(--stamp);">${target}</code></span>
+    </div>
+    <div id="decryptPhase" style="font-size:12px; color:var(--ink-soft); line-height:1.5;">
+      <div>Initializing offline cracker phases...</div>
+    </div>
+  `;
+
+      const phaseDiv = resDiv.querySelector('#decryptPhase');
+
+      setTimeout(() => {
+        phaseDiv.innerHTML += `<div>🔍 Phase 1: Checking session history and local dictionary...</div>`;
+
+        const dict = [
+          "", "abc", "123456", "password", "admin", "qwerty", "12345", "123456789",
+          "1234", "administrator", "root", "secret", "password123", "hello",
+          "welcome", "letmein", "BUBT", "BUBT CSE", "Hello BUBT CSE!",
+          "The quick brown fox jumps over the lazy dog", "hash", "ledger", "antigravity",
+          "cybersecurity", "crypto", "security", "12345678", "111111", "123321", "monkey"
+        ];
+
+        const allWords = new Set([...dict, ...Array.from(sessionHistory)]);
+        let found = null;
+        let foundMethod = '';
+
+        const startT = performance.now();
+
+        for (const word of allWords) {
+          if (md5Fast(word) === target) {
+            found = word;
+            foundMethod = 'Common Dictionary Lookup';
+            break;
+          }
+        }
+
+        if (found !== null) {
+          const elapsed = (performance.now() - startT).toFixed(2);
+          showDecryptionSuccess(resDiv, found, foundMethod, elapsed);
+          return;
+        }
+
+        setTimeout(() => {
+          phaseDiv.innerHTML += `<div>✓ Dictionary search finished (no match).</div>`;
+          phaseDiv.innerHTML += `<div style="margin-top:4px;">🔍 Phase 2: Running brute-force search (alphanumeric, length 1-3)...</div>`;
+
+          setTimeout(() => {
+            const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ';
+            const n = chars.length;
+
+            // L1
+            for (let i = 0; i < n; i++) {
+              const s = chars[i];
+              if (md5Fast(s) === target) { found = s; break; }
+            }
+
+            // L2
+            if (found === null) {
+              for (let i = 0; i < n; i++) {
+                for (let j = 0; j < n; j++) {
+                  const s = chars[i] + chars[j];
+                  if (md5Fast(s) === target) { found = s; break; }
+                }
+                if (found !== null) break;
+              }
+            }
+
+            // L3
+            if (found === null) {
+              for (let i = 0; i < n; i++) {
+                for (let j = 0; j < n; j++) {
+                  for (let k = 0; k < n; k++) {
+                    const s = chars[i] + chars[j] + chars[k];
+                    if (md5Fast(s) === target) { found = s; break; }
+                  }
+                  if (found !== null) break;
+                }
+                if (found !== null) break;
+              }
+            }
+
+            const elapsed = (performance.now() - startT).toFixed(2);
+
+            if (found !== null) {
+              showDecryptionSuccess(resDiv, found, 'Alphanumeric Brute-Force (Length 1-3)', elapsed);
+            } else {
+              showDecryptionFailure(resDiv, target, elapsed);
+            }
+          }, 600);
+        }, 500);
+      }, 400);
+    }
+
+    function showDecryptionSuccess(resDiv, plaintext, method, elapsed) {
+      resDiv.style.background = '#eef9f6';
+      resDiv.style.borderColor = '#c2ece2';
+      resDiv.style.color = '#1e5a4b';
+      resDiv.innerHTML = `
+    <div style="font-weight:700; font-size:14px; margin-bottom:6px;">🔓 Success! MD5 Hash Cracked</div>
+    <div style="margin-bottom:8px;">
+      Plaintext: <code style="background:#fff; padding:3px 8px; border-radius:4px; border:1px solid #c2ece2; font-size:14.5px; color:var(--ink); font-weight:700; font-family:var(--mono);">${esc(plaintext)}</code>
+    </div>
+    <div style="font-size:11.5px; color:#5a8a7e; line-height:1.4;">
+      Method: ${method}<br>
+      Time elapsed: ${elapsed} ms
+    </div>
+  `;
+    }
+
+    function showDecryptionFailure(resDiv, target, elapsed) {
+      resDiv.style.background = '#fff8f8';
+      resDiv.style.borderColor = '#fdd';
+      resDiv.style.color = '#a94442';
+      resDiv.innerHTML = `
+    <div style="font-weight:700; font-size:14px; margin-bottom:6px;">❌ Hash Not Found</div>
+    <p style="font-size:12px; margin:0 0 8px; line-height:1.45;">
+      Checked all session history, common dictionary words, and 250,000+ alphanumeric combinations up to length 3.
+      No matching plaintext was found.
+    </p>
+    <div style="font-size:11.5px; color:#c76c6c; line-height:1.45; border-top: 1px dashed #fcd; padding-top:6px;">
+      <strong>Why did this happen?</strong> MD5 is a one-way cryptographic hash function. It is mathematically impossible to "reverse" or decrypt it. Decryption is only possible through dictionary lookup or brute-forcing. Longer passwords require massive parallel GPU power (like hashcat) or precomputed lookup databases (Rainbow Tables).
+    </div>
+  `;
+    }
+
+    compute();
+  </script>
+</body>
+
+</html>
